@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartHelper</title>
+
+<!-- SolaimanLipi Bangla font -->
+<link rel="stylesheet" href="https://fonts.maateen.me/solaiman-lipi/font.css">
+
+<!-- Suppress the Tailwind CDN "should not be used in production" dev notice
+     (cosmetic console message only — does not affect functionality). -->
+<script>
+  (function(){
+    var origWarn = console.warn;
+    console.warn = function(){
+      if (arguments[0] && String(arguments[0]).indexOf('cdn.tailwindcss.com') !== -1) return;
+      origWarn.apply(console, arguments);
+    };
+  })();
+</script>
+
+<!-- Tailwind CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { darkMode: 'class', theme: { extend: {} } }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<!-- QR code generator (client-side, no server calls) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- Image -> PDF (client-side) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+  html { scroll-behavior: smooth; }
+
+  :root{
+    --bg-1:#faf5ea; --bg-2:#f0e4cd;
+    --card-top:#fffdf9; --card-bottom:#f8efdc;
+    --card-border:rgba(178,138,60,.22);
+    --accent-1:#eccb87; --accent-2:#c79a3e; --accent-ink:#4a3410;
+    --ink:#2d2715; --ink-soft:#75684e;
+    --input-bg:#fffcf5; --input-border:#e3d4ad;
+  }
+  html.dark{
+    --bg-1:#1a1510; --bg-2:#100d09;
+    --card-top:#2a2115; --card-bottom:#1d1710;
+    --card-border:rgba(212,164,70,.20);
+    --accent-1:#e9c479; --accent-2:#b8872f; --accent-ink:#2a1d08;
+    --ink:#f3e9d4; --ink-soft:#b8a888;
+    --input-bg:#221b12; --input-border:#3a2f1c;
+  }
+
+  body{
+    font-family:'Inter', ui-sans-serif, system-ui, sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(1100px 500px at 10% -10%, rgba(255,255,255,.55), transparent 60%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    min-height:100vh;
+  }
+  html.dark body{
+    background:
+      radial-gradient(1100px 500px at 10% -10%, rgba(255,255,255,.04), transparent 60%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-2));
+  }
+
+  body.font-bangla, body.font-bangla * {
+    font-family:'SolaimanLipi','Noto Sans Bengali',sans-serif !important;
+  }
+  body.font-bangla{ line-height:1.75; }
+  button, input, select, textarea, optgroup { font-family: inherit; }
+
+  ::-webkit-scrollbar{ width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--accent-2); border-radius:9999px; }
+
+  .fade-in{ animation:fadeIn .35s ease; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
+
+  .card{
+    position:relative; overflow:hidden; border-radius:1.1rem;
+    background:linear-gradient(180deg, var(--card-top), var(--card-bottom));
+    border:1px solid var(--card-border);
+    box-shadow:0 1px 1px rgba(255,255,255,.6) inset, 0 14px 34px -16px rgba(90,62,16,.35);
+  }
+  html.dark .card{ box-shadow:0 1px 1px rgba(255,255,255,.05) inset, 0 14px 34px -16px rgba(0,0,0,.55); }
+  .card::before{
+    content:""; position:absolute; inset:0 0 auto 0; height:48%; pointer-events:none;
+    background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,0));
+  }
+  html.dark .card::before{ background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,0)); }
+
+  .glass-chip{
+    background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
+    border:1px solid var(--card-border);
+    backdrop-filter:blur(6px);
+  }
+  html.dark .glass-chip{ background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02)); }
+
+  .btn-primary{
+    background:linear-gradient(180deg, var(--accent-1), var(--accent-2));
+    color:var(--accent-ink);
+    box-shadow:0 1px 0 rgba(255,255,255,.55) inset, 0 8px 18px -6px rgba(150,108,24,.55);
+    transition:filter .15s ease, transform .1s ease;
+  }
+  .btn-primary:hover{ filter:brightness(1.05); }
+  .btn-primary:active{ transform:translateY(1px); }
+  .btn-primary:disabled{ opacity:.45; filter:none; }
+
+  .btn-secondary{
+    background:linear-gradient(180deg, #fffdf8, #f2e8d2);
+    border:1px solid var(--card-border); color:var(--ink);
+    transition:filter .15s ease;
+  }
+  html.dark .btn-secondary{ background:linear-gradient(180deg, #27201582, #1c170f); color:var(--ink); }
+  .btn-secondary:hover{ filter:brightness(1.04); }
+  .btn-secondary:disabled{ opacity:.45; }
+
+  .field{ background:var(--input-bg); border:1px solid var(--input-border); color:var(--ink); }
+  .field:focus{ outline:none; border-color:var(--accent-2); box-shadow:0 0 0 3px rgba(199,154,62,.18); }
+
+  .icon-badge{
+    width:2.6rem; height:2.6rem; border-radius:.85rem;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    background:linear-gradient(180deg, var(--accent-1), var(--accent-2));
+    color:#fffaf0; box-shadow:0 6px 14px -5px rgba(150,108,24,.55);
+  }
+  .icon-badge.lg{ width:3.25rem; height:3.25rem; border-radius:1rem; }
+  .icon-badge.sm{ width:2.1rem; height:2.1rem; border-radius:.65rem; }
+  .icon-badge.red{ background:linear-gradient(180deg,#f3a5a5,#d9534f); box-shadow:0 6px 14px -5px rgba(185,55,55,.5); }
+  .icon-badge.blue{ background:linear-gradient(180deg,#9fc3ec,#4f82c7); box-shadow:0 6px 14px -5px rgba(45,85,150,.5); }
+  .icon-badge.orange{ background:linear-gradient(180deg,#f3c08a,#d98a2f); box-shadow:0 6px 14px -5px rgba(185,120,30,.5); }
+  .icon-badge.green{ background:linear-gradient(180deg,#a9d8b4,#4f9a63); box-shadow:0 6px 14px -5px rgba(45,120,70,.5); }
+  .icon-badge.purple{ background:linear-gradient(180deg,#c9b2ec,#8a5fc7); box-shadow:0 6px 14px -5px rgba(110,65,180,.5); }
+
+  .icon{ width:1.35rem; height:1.35rem; stroke:currentColor; stroke-width:1.8; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+  .icon-sm{ width:1.1rem; height:1.1rem; }
+  .icon-xs{ width:.95rem; height:.95rem; }
+  .icon-lg{ width:1.7rem; height:1.7rem; }
+  .icon-xl{ width:1.9rem; height:1.9rem; }
+
+  .toggle-dot{ transition:transform .25s ease; }
+
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; height:5px; border-radius:9999px;
+    background:linear-gradient(90deg, var(--accent-2), var(--accent-1));
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:18px; height:18px; border-radius:50%;
+    background:#fffaf0; border:2px solid var(--accent-2); cursor:pointer; margin-top:-6.5px;
+    box-shadow:0 2px 6px rgba(0,0,0,.25);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px; border-radius:50%; background:#fffaf0; border:2px solid var(--accent-2); cursor:pointer;
+  }
+
+  .gov-link:hover .gov-arrow{ transform:translateX(3px); }
+  .gov-arrow{ transition:transform .15s ease; }
+
+  /* ===== Multi-page navigation ===== */
+  .page{ display:none; }
+  .page.active{ display:block; animation:pageIn .3s ease; }
+  @keyframes pageIn{ from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;} }
+
+  /* Fixed bottom app-style tab bar */
+  .bottom-nav{
+    position:fixed; left:0; right:0; bottom:0; z-index:50;
+    background:linear-gradient(180deg, var(--card-top), var(--card-bottom));
+    border-top:1px solid var(--card-border);
+    box-shadow:0 -10px 30px -14px rgba(90,62,16,.35);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  html.dark .bottom-nav{ box-shadow:0 -10px 30px -14px rgba(0,0,0,.6); }
+
+  .nav-btn{
+    flex:1; min-width:0; position:relative; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:.25rem;
+    padding:.6rem .25rem .55rem; font-size:.66rem; font-weight:600;
+    color:var(--ink-soft); transition:color .15s ease;
+  }
+  .nav-btn span{ max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .nav-btn::before{
+    content:""; position:absolute; top:.2rem; left:50%; translate:-50% 0;
+    width:2rem; height:2rem; border-radius:.7rem; z-index:-1;
+    transition:background .15s ease;
+  }
+  .nav-btn.nav-active{ color:var(--accent-2); }
+  .nav-btn.nav-active::before{ background:linear-gradient(180deg, var(--accent-1), var(--accent-2)); opacity:.18; }
+  .nav-btn.nav-active svg{ color:var(--accent-2); }
+
+  .home-card{ cursor:pointer; text-align:left; width:100%; transition:transform .15s ease, box-shadow .15s ease; }
+  .home-card:hover{ transform:translateY(-3px); }
+
+  .tool-chip{
+    cursor:pointer; text-align:left; display:flex; align-items:center; gap:.6rem;
+    padding:.65rem .75rem; border-radius:.85rem; transition:transform .15s ease, filter .15s ease;
+  }
+  .tool-chip:hover{ transform:translateY(-2px); filter:brightness(1.03); }
+
+  .pill{
+    display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .9rem;
+    border-radius:9999px; font-size:.78rem; font-weight:600; color:var(--ink-soft);
+  }
+
+  .recent-chip{
+    display:inline-flex; align-items:center; gap:.4rem; padding:.45rem .9rem;
+    border-radius:9999px; font-size:.78rem; font-weight:600; white-space:nowrap;
+    cursor:pointer; transition:filter .15s ease;
+  }
+  .recent-chip:hover{ filter:brightness(1.04); }
+
+  .seg-wrap{ display:flex; gap:.5rem; }
+
+  .list-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:.75rem .9rem; border-radius:.75rem; margin-bottom:.4rem;
+  }
+  .list-row.row-active{
+    background:linear-gradient(180deg, var(--accent-1), var(--accent-2)); color:var(--accent-ink);
+  }
+
+  .note-item{
+    display:flex; align-items:center; justify-content:space-between; gap:.6rem;
+    padding:.65rem .9rem; border-radius:.75rem; margin-bottom:.5rem;
+  }
+  .note-del{ flex-shrink:0; color:var(--ink-soft); transition:color .15s ease; cursor:pointer; }
+  .note-del:hover{ color:#d9534f; }
+
+  #qrCanvasBox img, #qrCanvasBox canvas{ border-radius:.75rem; background:#fff; padding:10px; }
+
+  .result-box{
+    border-radius:.85rem; padding:1rem; text-align:center;
+  }
+</style>
+</head>
+
+<body class="min-h-screen transition-colors duration-300">
+
+<!-- ===================== HEADER ===================== -->
+<header class="sticky top-0 z-40 backdrop-blur glass-chip border-b" style="border-color:var(--card-border);">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+    <button class="flex items-center gap-2.5" id="logoHomeBtn" aria-label="Go to home">
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-lg"
+           style="background:linear-gradient(180deg, var(--accent-1), var(--accent-2)); color:var(--accent-ink); box-shadow:0 6px 14px -5px rgba(150,108,24,.5);">S</div>
+      <span class="text-xl font-extrabold tracking-tight">SmartHelper</span>
+    </button>
+
+    <div class="flex items-center gap-3">
+      <button id="langToggle" class="relative flex items-center glass-chip rounded-full p-1 w-20 h-9 text-xs font-semibold select-none" aria-label="Toggle language">
+        <span class="absolute left-1 top-1 bottom-1 w-9 rounded-full toggle-dot" id="langDot"
+              style="background:linear-gradient(180deg, var(--accent-1), var(--accent-2)); box-shadow:0 2px 6px rgba(0,0,0,.2);"></span>
+        <span class="relative z-10 w-1/2 text-center" id="langLabelEn">EN</span>
+        <span class="relative z-10 w-1/2 text-center" id="langLabelBn">বাং</span>
+      </button>
+
+      <button id="themeToggle" class="w-9 h-9 rounded-full glass-chip flex items-center justify-center" aria-label="Toggle theme">
+        <svg id="iconSun" class="icon icon-sm hidden" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.2 4.2l1.5 1.5M18.3 18.3l1.5 1.5M2 12h2M20 12h2M4.2 19.8l1.5-1.5M18.3 5.7l1.5-1.5"/></svg>
+        <svg id="iconMoon" class="icon icon-sm hidden" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ===================== BOTTOM APP NAV ===================== -->
+<nav class="bottom-nav">
+  <div class="max-w-6xl mx-auto px-2 flex items-stretch justify-around">
+    <button class="nav-btn" data-nav="home">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v10h5v-6h2v6h5V10"/></svg>
+      <span data-i18n="navHome"></span>
+    </button>
+    <button class="nav-btn" data-nav="media">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+      <span data-i18n="navMedia"></span>
+    </button>
+    <button class="nav-btn" data-nav="calc">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><rect x="7.5" y="4.5" width="9" height="3.5" rx=".5"/><path d="M7.5 11h9M7.5 14.5h9M7.5 18h9M11 11v7M14.5 11v7"/></svg>
+      <span data-i18n="navCalc"></span>
+    </button>
+    <button class="nav-btn" data-nav="islamic">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 1 3 3c0 1.1-.6 2-1.5 2.5V9h-3V7.5C9.6 7 9 6.1 9 5a3 3 0 0 1 3-3z"/><path d="M4 21V12l3-2 3 2v9M11 21v-6h2v6M14 21v-9l3-2 3 2v9"/><path d="M3 21h18"/></svg>
+      <span data-i18n="navIslamic"></span>
+    </button>
+    <button class="nav-btn" data-nav="more">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      <span data-i18n="navMore"></span>
+    </button>
+  </div>
+</nav>
+
+<main class="max-w-6xl mx-auto px-4 pt-8" style="padding-bottom:calc(5.5rem + env(safe-area-inset-bottom));">
+
+  <!-- ===================== PAGE: HOME ===================== -->
+  <section class="page" data-page="home">
+
+    <div class="flex justify-center mb-4">
+      <span class="pill glass-chip">
+        <svg class="icon icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span id="greetingText"></span>
+        <span id="liveClock" class="font-bold" style="color:var(--accent-2);"></span>
+      </span>
+    </div>
+
+    <div class="text-center pb-6">
+      <h1 class="text-3xl md:text-4xl font-extrabold mb-2" data-i18n="heroTitle"></h1>
+      <p style="color:var(--ink-soft);" class="max-w-2xl mx-auto" data-i18n="heroSubtitle"></p>
+    </div>
+
+    <!-- Next prayer widget -->
+    <div class="card p-4 md:p-5 mb-6 flex items-center gap-4 cursor-pointer" id="nextPrayerCard" data-goto="islamic">
+      <div class="icon-badge lg">
+        <svg class="icon icon-xl" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 1 3 3c0 1.1-.6 2-1.5 2.5V9h-3V7.5C9.6 7 9 6.1 9 5a3 3 0 0 1 3-3z"/><path d="M4 21V12l3-2 3 2v9M11 21v-6h2v6M14 21v-9l3-2 3 2v9"/><path d="M3 21h18"/></svg>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="text-xs font-semibold" style="color:var(--ink-soft);" data-i18n="nextPrayerLabel"></div>
+        <div class="text-lg font-bold truncate"><span id="nextPrayerName"></span> — <span id="nextPrayerTime"></span></div>
+        <div class="text-xs" style="color:var(--accent-2);"><span data-i18n="nextPrayerCountdownPrefix"></span> <span id="nextPrayerCountdown"></span></div>
+      </div>
+    </div>
+
+    <!-- Recently used -->
+    <div id="recentWrap" class="mb-6 hidden">
+      <div class="text-sm font-semibold mb-2" style="color:var(--ink-soft);" data-i18n="recentTitle"></div>
+      <div id="recentChips" class="flex flex-wrap gap-2"></div>
+    </div>
+
+    <!-- Big feature cards -->
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+      <button class="home-card card p-5" data-goto="media">
+        <div class="icon-badge lg mb-4">
+          <svg class="icon icon-xl" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        </div>
+        <h3 class="font-bold mb-1" data-i18n="navMedia"></h3>
+        <p class="text-xs" style="color:var(--ink-soft);" data-i18n="mediaPageDesc"></p>
+      </button>
+
+      <button class="home-card card p-5" data-goto="calc">
+        <div class="icon-badge lg mb-4">
+          <svg class="icon icon-xl" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><rect x="7.5" y="4.5" width="9" height="3.5" rx=".5"/><path d="M7.5 11h9M7.5 14.5h9M7.5 18h9M11 11v7M14.5 11v7"/></svg>
+        </div>
+        <h3 class="font-bold mb-1" data-i18n="navCalc"></h3>
+        <p class="text-xs" style="color:var(--ink-soft);" data-i18n="calcPageDesc"></p>
+      </button>
+
+      <button class="home-card card p-5" data-goto="islamic">
+        <div class="icon-badge lg mb-4">
+          <svg class="icon icon-xl" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 1 3 3c0 1.1-.6 2-1.5 2.5V9h-3V7.5C9.6 7 9 6.1 9 5a3 3 0 0 1 3-3z"/><path d="M4 21V12l3-2 3 2v9M11 21v-6h2v6M14 21v-9l3-2 3 2v9"/><path d="M3 21h18"/></svg>
+        </div>
+        <h3 class="font-bold mb-1" data-i18n="navIslamic"></h3>
+        <p class="text-xs" style="color:var(--ink-soft);" data-i18n="islamicPageDesc"></p>
+      </button>
+
+      <button class="home-card card p-5" data-goto="more">
+        <div class="icon-badge lg red mb-4">
+          <svg class="icon icon-xl" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.6 3.9a2 2 0 0 0-3.3 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+        </div>
+        <h3 class="font-bold mb-1" data-i18n="navMore"></h3>
+        <p class="text-xs" style="color:var(--ink-soft);" data-i18n="morePageDesc"></p>
+      </button>
+    </div>
+
+    <!-- All tools quick grid -->
+    <div class="text-sm font-semibold mb-3" style="color:var(--ink-soft);" data-i18n="allToolsTitle"></div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <button class="tool-chip glass-chip" data-goto="media">
+        <div class="icon-badge sm"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="imgSectionTitle"></span>
+      </button>
+      <button class="tool-chip glass-chip" data-goto="media">
+        <div class="icon-badge sm"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M17 17h3v3h-3z"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="qrSectionTitle"></span>
+      </button>
+      <button class="tool-chip glass-chip" data-goto="media">
+        <div class="icon-badge sm"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><path d="M8.5 17v-5h1.3c1 0 1.7.6 1.7 1.5s-.7 1.5-1.7 1.5H8.5M13 17v-5h2M12.5 14.5h2"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="pdfSectionTitle"></span>
+      </button>
+      <button class="tool-chip glass-chip" data-goto="calc">
+        <div class="icon-badge sm"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2.2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="ageSectionTitle"></span>
+      </button>
+      <button class="tool-chip glass-chip" data-goto="calc">
+        <div class="icon-badge sm"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M7 7h11M18 7l-3-3M18 7l-3 3"/><path d="M17 17H6M6 17l3-3M6 17l3 3"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="unitSectionTitle"></span>
+      </button>
+      <button class="tool-chip glass-chip" data-goto="calc">
+        <div class="icon-badge sm"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 3v4M15 3v4M6 7h12l-1 14H7z"/><path d="M9 12h6M9 16h4"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="bmiSectionTitle"></span>
+      </button>
+      <button class="tool-chip glass-chip" data-goto="calc">
+        <div class="icon-badge sm"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 6V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="emiSectionTitle"></span>
+      </button>
+      <button class="tool-chip glass-chip" data-goto="calc">
+        <div class="icon-badge sm"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 2v2M12 20v2M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H7"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="vatSectionTitle"></span>
+      </button>
+      <button class="tool-chip glass-chip" data-goto="calc">
+        <div class="icon-badge sm"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="8" cy="12" r="6"/><circle cx="16" cy="12" r="6"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="currencySectionTitle"></span>
+      </button>
+      <button class="tool-chip glass-chip" data-goto="islamic">
+        <div class="icon-badge sm"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="prayerSectionTitle"></span>
+      </button>
+      <button class="tool-chip glass-chip" data-goto="islamic">
+        <div class="icon-badge sm"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2.2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8 13h2M8 17h2M13 13h2M13 17h2"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="hijriSectionTitle"></span>
+      </button>
+      <button class="tool-chip glass-chip" data-goto="islamic">
+        <div class="icon-badge sm"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 3c3 3 6 6.5 6 10a6 6 0 0 1-12 0c0-3.5 3-7 6-10z"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="zakatSectionTitle"></span>
+      </button>
+      <button class="tool-chip glass-chip" data-goto="more">
+        <div class="icon-badge sm red"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.6 3.9a2 2 0 0 0-3.3 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="emgSectionTitle"></span>
+      </button>
+      <button class="tool-chip glass-chip" data-goto="more">
+        <div class="icon-badge sm"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 21h16M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="govSectionTitle"></span>
+      </button>
+      <button class="tool-chip glass-chip" data-goto="more">
+        <div class="icon-badge sm purple"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 4h12l4 4v12H4z"/><path d="M8 4v5h8V4M8 13h8M8 17h5"/></svg></div>
+        <span class="text-sm font-medium" data-i18n="notesSectionTitle"></span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ===================== PAGE: MEDIA & DOCUMENTS ===================== -->
+  <section class="page" data-page="media">
+    <div class="space-y-6">
+
+      <!-- Image resizer -->
+      <div class="card p-5 md:p-7">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge">
+            <svg class="icon icon-lg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          </div>
+          <h2 class="text-xl font-bold" data-i18n="imgSectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);" data-i18n="imgSectionDesc"></p>
+
+        <div class="grid md:grid-cols-2 gap-6">
+          <div class="space-y-4">
+            <label class="block border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors" id="dropZone" style="border-color:var(--input-border);">
+              <input type="file" id="imgInput" accept="image/*" class="hidden">
+              <svg class="icon icon-lg mx-auto mb-2" style="color:var(--accent-2);" viewBox="0 0 24 24"><path d="M7 18a4.5 4.5 0 0 1-1-8.9A5 5 0 0 1 16 7.1 4.5 4.5 0 0 1 17 18H7z"/><path d="M12 12v6M9.3 14.3 12 12l2.7 2.3"/></svg>
+              <span class="text-sm font-medium" data-i18n="imgUploadLabel"></span>
+            </label>
+
+            <div>
+              <label class="text-sm font-medium mb-1 block" data-i18n="imgSizeLabel"></label>
+              <select id="imgSizeSelect" class="field w-full px-3 py-2 rounded-lg text-sm">
+                <optgroup id="imgSizeGroupPct" label="Percentage">
+                  <option value="pct-100" data-i18n="imgSizeOriginal"></option>
+                  <option value="pct-75">75%</option>
+                  <option value="pct-50">50%</option>
+                  <option value="pct-25">25%</option>
+                  <option value="pct-10">10%</option>
+                </optgroup>
+                <optgroup id="imgSizeGroupPx" label="Fixed Width">
+                  <option value="w-1920" data-i18n="imgSizeLarge"></option>
+                  <option value="w-1280" data-i18n="imgSizeHD"></option>
+                  <option value="w-800" data-i18n="imgSizeMedium"></option>
+                  <option value="w-480" data-i18n="imgSizeSmall"></option>
+                  <option value="w-150" data-i18n="imgSizeThumb"></option>
+                </optgroup>
+              </select>
+              <p class="text-xs mt-1.5" style="color:var(--ink-soft);" id="imgSizePreviewDims"></p>
+            </div>
+
+            <div>
+              <label class="text-sm font-medium mb-1 flex justify-between">
+                <span data-i18n="imgQualityLabel"></span>
+                <span id="imgQualityVal">80%</span>
+              </label>
+              <input type="range" id="imgQuality" min="10" max="100" value="80" class="w-full">
+            </div>
+
+            <div class="flex gap-3">
+              <button id="imgProcessBtn" class="btn-primary flex-1 font-semibold py-2.5 rounded-lg text-sm" data-i18n="imgProcessBtn"></button>
+              <button id="imgDownloadBtn" class="btn-secondary flex-1 font-semibold py-2.5 rounded-lg text-sm" disabled data-i18n="imgDownloadBtn"></button>
+            </div>
+            <p id="imgSizeInfo" class="text-xs" style="color:var(--ink-soft);"></p>
+          </div>
+
+          <div class="flex items-center justify-center rounded-xl p-3 min-h-[260px]" style="background:var(--input-bg); border:1px dashed var(--input-border);">
+            <img id="imgPreview" class="max-w-full max-h-72 rounded-lg hidden">
+            <span id="imgPreviewPlaceholder" class="text-sm" style="color:var(--ink-soft);" data-i18n="imgPreviewPlaceholder"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- QR Code generator -->
+      <div class="card p-5 md:p-7">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge">
+            <svg class="icon icon-lg" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M17 17h3v3h-3z"/></svg>
+          </div>
+          <h2 class="text-xl font-bold" data-i18n="qrSectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);" data-i18n="qrSectionDesc"></p>
+
+        <div class="grid md:grid-cols-2 gap-6">
+          <div class="space-y-4">
+            <div>
+              <label class="text-sm font-medium mb-1 block" data-i18n="qrInputLabel"></label>
+              <textarea id="qrInput" rows="3" class="field w-full px-3 py-2 rounded-lg text-sm" data-i18n-placeholder="qrInputPlaceholder"></textarea>
+            </div>
+            <div class="flex gap-3">
+              <button id="qrGenerateBtn" class="btn-primary flex-1 font-semibold py-2.5 rounded-lg text-sm" data-i18n="qrGenerateBtn"></button>
+              <button id="qrDownloadBtn" class="btn-secondary flex-1 font-semibold py-2.5 rounded-lg text-sm" disabled data-i18n="qrDownloadBtn"></button>
+            </div>
+          </div>
+          <div class="flex items-center justify-center rounded-xl p-3 min-h-[200px]" style="background:var(--input-bg); border:1px dashed var(--input-border);" id="qrCanvasWrap">
+            <div id="qrCanvasBox"></div>
+            <span id="qrPlaceholder" class="text-sm" style="color:var(--ink-soft);" data-i18n="qrPreviewPlaceholder"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Image to PDF -->
+      <div class="card p-5 md:p-7">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge">
+            <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg>
+          </div>
+          <h2 class="text-xl font-bold" data-i18n="pdfSectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);" data-i18n="pdfSectionDesc"></p>
+
+        <label class="block border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors mb-4" id="pdfDropZone" style="border-color:var(--input-border);">
+          <input type="file" id="pdfInput" accept="image/*" multiple class="hidden">
+          <svg class="icon icon-lg mx-auto mb-2" style="color:var(--accent-2);" viewBox="0 0 24 24"><path d="M7 18a4.5 4.5 0 0 1-1-8.9A5 5 0 0 1 16 7.1 4.5 4.5 0 0 1 17 18H7z"/><path d="M12 12v6M9.3 14.3 12 12l2.7 2.3"/></svg>
+          <span class="text-sm font-medium" data-i18n="pdfUploadLabel"></span>
+        </label>
+        <p id="pdfFileCount" class="text-xs mb-4" style="color:var(--ink-soft);"></p>
+        <button id="pdfConvertBtn" class="btn-primary w-full font-semibold py-2.5 rounded-lg text-sm" data-i18n="pdfConvertBtn"></button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================== PAGE: CALCULATORS ===================== -->
+  <section class="page" data-page="calc">
+    <div class="grid md:grid-cols-2 gap-6">
+
+      <!-- Age Calculator -->
+      <div class="card p-5 md:p-7">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge"><svg class="icon icon-lg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2.2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg></div>
+          <h2 class="text-xl font-bold" data-i18n="ageSectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);" data-i18n="ageSectionDesc"></p>
+
+        <label class="text-sm font-medium mb-1 block" data-i18n="ageDobLabel"></label>
+        <input type="date" id="dobInput" class="field w-full px-3 py-2 rounded-lg text-sm mb-4">
+        <button id="ageCalcBtn" class="btn-primary w-full font-semibold py-2.5 rounded-lg text-sm" data-i18n="ageCalcBtn"></button>
+
+        <div id="ageResult" class="hidden mt-5 grid grid-cols-3 gap-2 text-center fade-in">
+          <div class="glass-chip rounded-lg py-3">
+            <div class="text-2xl font-extrabold" style="color:var(--accent-2);" id="ageYears">0</div>
+            <div class="text-xs" style="color:var(--ink-soft);" data-i18n="ageYearsLabel"></div>
+          </div>
+          <div class="glass-chip rounded-lg py-3">
+            <div class="text-2xl font-extrabold" style="color:var(--accent-2);" id="ageMonths">0</div>
+            <div class="text-xs" style="color:var(--ink-soft);" data-i18n="ageMonthsLabel"></div>
+          </div>
+          <div class="glass-chip rounded-lg py-3">
+            <div class="text-2xl font-extrabold" style="color:var(--accent-2);" id="ageDays">0</div>
+            <div class="text-xs" style="color:var(--ink-soft);" data-i18n="ageDaysLabel"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Unit Converter -->
+      <div class="card p-5 md:p-7">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge"><svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M7 7h11M18 7l-3-3M18 7l-3 3"/><path d="M17 17H6M6 17l3-3M6 17l3 3"/></svg></div>
+          <h2 class="text-xl font-bold" data-i18n="unitSectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);" data-i18n="unitSectionDesc"></p>
+
+        <div class="flex gap-2 mb-4">
+          <button class="unitTab btn-primary flex-1 py-2 rounded-lg text-sm font-semibold" data-tab="length" data-i18n="unitTabLength"></button>
+          <button class="unitTab btn-secondary flex-1 py-2 rounded-lg text-sm font-semibold" data-tab="land" data-i18n="unitTabLand"></button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 items-end mb-2">
+          <div>
+            <label class="text-xs font-medium mb-1 block" data-i18n="unitFromLabel"></label>
+            <input type="number" id="unitValue" value="1" class="field w-full px-3 py-2 rounded-lg text-sm">
+          </div>
+          <div><select id="unitFrom" class="field w-full px-3 py-2 rounded-lg text-sm"></select></div>
+        </div>
+
+        <div class="flex justify-center my-1" style="color:var(--ink-soft);">
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 items-end">
+          <div><input type="text" id="unitResult" readonly class="field w-full px-3 py-2 rounded-lg text-sm font-semibold"></div>
+          <div><select id="unitTo" class="field w-full px-3 py-2 rounded-lg text-sm"></select></div>
+        </div>
+      </div>
+
+      <!-- BMI Calculator -->
+      <div class="card p-5 md:p-7">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge"><svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M9 3v4M15 3v4M6 7h12l-1 14H7z"/><path d="M9 12h6M9 16h4"/></svg></div>
+          <h2 class="text-xl font-bold" data-i18n="bmiSectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);" data-i18n="bmiSectionDesc"></p>
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="text-sm font-medium mb-1 block" data-i18n="bmiHeightLabel"></label>
+            <input type="number" id="bmiHeight" placeholder="170" class="field w-full px-3 py-2 rounded-lg text-sm">
+          </div>
+          <div>
+            <label class="text-sm font-medium mb-1 block" data-i18n="bmiWeightLabel"></label>
+            <input type="number" id="bmiWeight" placeholder="65" class="field w-full px-3 py-2 rounded-lg text-sm">
+          </div>
+        </div>
+        <button id="bmiCalcBtn" class="btn-primary w-full font-semibold py-2.5 rounded-lg text-sm" data-i18n="bmiCalcBtn"></button>
+
+        <div id="bmiResult" class="hidden mt-5 result-box glass-chip fade-in">
+          <div class="text-3xl font-extrabold" style="color:var(--accent-2);" id="bmiValue">0</div>
+          <div class="text-sm font-semibold" id="bmiCategory"></div>
+        </div>
+      </div>
+
+      <!-- EMI / Loan Calculator -->
+      <div class="card p-5 md:p-7">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge"><svg class="icon icon-lg" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 6V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg></div>
+          <h2 class="text-xl font-bold" data-i18n="emiSectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);" data-i18n="emiSectionDesc"></p>
+
+        <div class="space-y-3 mb-4">
+          <div>
+            <label class="text-sm font-medium mb-1 block" data-i18n="emiPrincipalLabel"></label>
+            <input type="number" id="emiPrincipal" placeholder="500000" class="field w-full px-3 py-2 rounded-lg text-sm">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-sm font-medium mb-1 block" data-i18n="emiRateLabel"></label>
+              <input type="number" id="emiRate" placeholder="9" class="field w-full px-3 py-2 rounded-lg text-sm">
+            </div>
+            <div>
+              <label class="text-sm font-medium mb-1 block" data-i18n="emiTenureLabel"></label>
+              <input type="number" id="emiTenure" placeholder="36" class="field w-full px-3 py-2 rounded-lg text-sm">
+            </div>
+          </div>
+        </div>
+        <button id="emiCalcBtn" class="btn-primary w-full font-semibold py-2.5 rounded-lg text-sm" data-i18n="emiCalcBtn"></button>
+
+        <div id="emiResult" class="hidden mt-5 grid grid-cols-1 gap-2 fade-in">
+          <div class="glass-chip rounded-lg py-2.5 px-3 flex justify-between items-center">
+            <span class="text-xs" style="color:var(--ink-soft);" data-i18n="emiMonthlyLabel"></span>
+            <span class="font-bold" id="emiMonthlyVal" style="color:var(--accent-2);"></span>
+          </div>
+          <div class="glass-chip rounded-lg py-2.5 px-3 flex justify-between items-center">
+            <span class="text-xs" style="color:var(--ink-soft);" data-i18n="emiInterestLabel"></span>
+            <span class="font-semibold" id="emiInterestVal"></span>
+          </div>
+          <div class="glass-chip rounded-lg py-2.5 px-3 flex justify-between items-center">
+            <span class="text-xs" style="color:var(--ink-soft);" data-i18n="emiTotalLabel"></span>
+            <span class="font-semibold" id="emiTotalVal"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- VAT Calculator -->
+      <div class="card p-5 md:p-7">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge"><svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M12 2v2M12 20v2M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H7"/></svg></div>
+          <h2 class="text-xl font-bold" data-i18n="vatSectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);" data-i18n="vatSectionDesc"></p>
+
+        <div class="flex gap-2 mb-4">
+          <button class="vatModeTab btn-primary flex-1 py-2 rounded-lg text-sm font-semibold" data-mode="exclusive" data-i18n="vatModeExclusive"></button>
+          <button class="vatModeTab btn-secondary flex-1 py-2 rounded-lg text-sm font-semibold" data-mode="inclusive" data-i18n="vatModeInclusive"></button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="text-sm font-medium mb-1 block" data-i18n="vatAmountLabel"></label>
+            <input type="number" id="vatAmount" placeholder="1000" class="field w-full px-3 py-2 rounded-lg text-sm">
+          </div>
+          <div>
+            <label class="text-sm font-medium mb-1 block" data-i18n="vatRateLabel"></label>
+            <input type="number" id="vatRate" value="15" class="field w-full px-3 py-2 rounded-lg text-sm">
+          </div>
+        </div>
+        <button id="vatCalcBtn" class="btn-primary w-full font-semibold py-2.5 rounded-lg text-sm" data-i18n="vatCalcBtn"></button>
+
+        <div id="vatResult" class="hidden mt-5 grid grid-cols-1 gap-2 fade-in">
+          <div class="glass-chip rounded-lg py-2.5 px-3 flex justify-between items-center">
+            <span class="text-xs" style="color:var(--ink-soft);" data-i18n="vatNetLabel"></span>
+            <span class="font-semibold" id="vatNetVal"></span>
+          </div>
+          <div class="glass-chip rounded-lg py-2.5 px-3 flex justify-between items-center">
+            <span class="text-xs" style="color:var(--ink-soft);" data-i18n="vatAmountVatLabel"></span>
+            <span class="font-semibold" id="vatVatVal"></span>
+          </div>
+          <div class="glass-chip rounded-lg py-2.5 px-3 flex justify-between items-center">
+            <span class="text-xs" style="color:var(--ink-soft);" data-i18n="vatTotalLabel"></span>
+            <span class="font-bold" id="vatTotalVal" style="color:var(--accent-2);"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Currency Converter -->
+      <div class="card p-5 md:p-7">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge"><svg class="icon icon-lg" viewBox="0 0 24 24"><circle cx="8" cy="12" r="6"/><circle cx="16" cy="12" r="6"/></svg></div>
+          <h2 class="text-xl font-bold" data-i18n="currencySectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);" data-i18n="currencySectionDesc"></p>
+
+        <div class="mb-3">
+          <label class="text-sm font-medium mb-1 block" data-i18n="currencyAmountLabel"></label>
+          <input type="number" id="currencyAmount" value="1" class="field w-full px-3 py-2 rounded-lg text-sm">
+        </div>
+        <div class="grid grid-cols-2 gap-3 items-end mb-4">
+          <div>
+            <label class="text-xs font-medium mb-1 block" data-i18n="currencyFromLabel"></label>
+            <select id="currencyFrom" class="field w-full px-3 py-2 rounded-lg text-sm"></select>
+          </div>
+          <div>
+            <label class="text-xs font-medium mb-1 block" data-i18n="currencyToLabel"></label>
+            <select id="currencyTo" class="field w-full px-3 py-2 rounded-lg text-sm"></select>
+          </div>
+        </div>
+        <button id="currencyConvertBtn" class="btn-primary w-full font-semibold py-2.5 rounded-lg text-sm" data-i18n="currencyConvertBtn"></button>
+
+        <div id="currencyResult" class="hidden mt-5 result-box glass-chip fade-in">
+          <div class="text-2xl font-extrabold" style="color:var(--accent-2);" id="currencyResultVal"></div>
+          <div class="text-xs mt-1" style="color:var(--ink-soft);" id="currencyResultNote"></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================== PAGE: ISLAMIC ===================== -->
+  <section class="page" data-page="islamic">
+    <div class="grid md:grid-cols-2 gap-6">
+
+      <!-- Prayer Times -->
+      <div class="card p-5 md:p-7 md:col-span-2">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge"><svg class="icon icon-lg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <h2 class="text-xl font-bold" data-i18n="prayerSectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-4" style="color:var(--ink-soft);" data-i18n="prayerSectionDesc"></p>
+
+        <div id="prayerList" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3"></div>
+        <p class="text-xs" style="color:var(--ink-soft);" data-i18n="prayerApproxNote"></p>
+      </div>
+
+      <!-- Hijri Converter -->
+      <div class="card p-5 md:p-7">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge"><svg class="icon icon-lg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2.2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8 13h2M8 17h2M13 13h2M13 17h2"/></svg></div>
+          <h2 class="text-xl font-bold" data-i18n="hijriSectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);" data-i18n="hijriSectionDesc"></p>
+
+        <label class="text-sm font-medium mb-1 block" data-i18n="hijriDateLabel"></label>
+        <input type="date" id="hijriInput" class="field w-full px-3 py-2 rounded-lg text-sm mb-4">
+        <button id="hijriConvertBtn" class="btn-primary w-full font-semibold py-2.5 rounded-lg text-sm" data-i18n="hijriConvertBtn"></button>
+
+        <div id="hijriResult" class="hidden mt-5 result-box glass-chip fade-in">
+          <div class="text-lg font-bold" id="hijriResultVal"></div>
+          <div class="text-xs mt-1" style="color:var(--ink-soft);" data-i18n="hijriApproxNote"></div>
+        </div>
+      </div>
+
+      <!-- Zakat Calculator -->
+      <div class="card p-5 md:p-7">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge"><svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M12 3c3 3 6 6.5 6 10a6 6 0 0 1-12 0c0-3.5 3-7 6-10z"/></svg></div>
+          <h2 class="text-xl font-bold" data-i18n="zakatSectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);" data-i18n="zakatSectionDesc"></p>
+
+        <div class="space-y-3 mb-4">
+          <div>
+            <label class="text-sm font-medium mb-1 block" data-i18n="zakatGoldPriceLabel"></label>
+            <input type="number" id="zakatGoldPrice" placeholder="11000" class="field w-full px-3 py-2 rounded-lg text-sm">
+          </div>
+          <div>
+            <label class="text-sm font-medium mb-1 block" data-i18n="zakatWealthLabel"></label>
+            <input type="number" id="zakatWealth" placeholder="200000" class="field w-full px-3 py-2 rounded-lg text-sm">
+          </div>
+        </div>
+        <button id="zakatCalcBtn" class="btn-primary w-full font-semibold py-2.5 rounded-lg text-sm" data-i18n="zakatCalcBtn"></button>
+
+        <div id="zakatResult" class="hidden mt-5 result-box glass-chip fade-in">
+          <div class="text-xs mb-1" style="color:var(--ink-soft);"><span data-i18n="zakatNisabPrefix"></span> <span id="zakatNisabVal"></span></div>
+          <div class="text-lg font-bold" id="zakatResultMsg"></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================== PAGE: MORE ===================== -->
+  <section class="page" data-page="more">
+    <div class="space-y-6">
+
+      <!-- Emergency hotlines -->
+      <div class="card p-5 md:p-7">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge red"><svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.6 3.9a2 2 0 0 0-3.3 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
+          <h2 class="text-xl font-bold" data-i18n="emgSectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);" data-i18n="emgSectionDesc"></p>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="glass-chip rounded-xl p-4 text-center">
+            <div class="icon-badge red mx-auto mb-2"><svg class="icon" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.5 8.5 8 11 4.5-2.5 8-6 8-11V5l-8-3z"/></svg></div>
+            <div class="font-semibold text-sm mb-2" data-i18n="emgNational"></div>
+            <a href="tel:999" class="flex items-center justify-center gap-1.5 btn-primary font-bold py-2 rounded-lg text-lg">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7 12.8 12.8 0 0 0 .7 2.8 2 2 0 0 1-.4 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4 12.8 12.8 0 0 0 2.8.7A2 2 0 0 1 22 16.9z"/></svg>
+              999
+            </a>
+          </div>
+          <div class="glass-chip rounded-xl p-4 text-center">
+            <div class="icon-badge blue mx-auto mb-2"><svg class="icon" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.5 8.5 8 11 4.5-2.5 8-6 8-11V5l-8-3z"/></svg></div>
+            <div class="font-semibold text-sm mb-2" data-i18n="emgPolice"></div>
+            <a href="tel:999" class="flex items-center justify-center gap-1.5 text-white font-bold py-2 rounded-lg text-lg" style="background:linear-gradient(180deg,#9fc3ec,#4f82c7); box-shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 8px 18px -6px rgba(45,85,150,.55);">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7 12.8 12.8 0 0 0 .7 2.8 2 2 0 0 1-.4 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4 12.8 12.8 0 0 0 2.8.7A2 2 0 0 1 22 16.9z"/></svg>
+              999
+            </a>
+          </div>
+          <div class="glass-chip rounded-xl p-4 text-center">
+            <div class="icon-badge orange mx-auto mb-2"><svg class="icon" viewBox="0 0 24 24"><path d="M12 2c1 4-4 5-4 9a4 4 0 0 0 8 0c0-2-1-3-1-5 2 1 3 4 3 6a6 6 0 0 1-12 0c0-5 4-7 6-10z"/></svg></div>
+            <div class="font-semibold text-sm mb-2" data-i18n="emgFire"></div>
+            <a href="tel:9555555" class="flex items-center justify-center gap-1.5 text-white font-bold py-2 rounded-lg text-base" style="background:linear-gradient(180deg,#f3c08a,#d98a2f); box-shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 8px 18px -6px rgba(185,120,30,.55);">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7 12.8 12.8 0 0 0 .7 2.8 2 2 0 0 1-.4 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4 12.8 12.8 0 0 0 2.8.7A2 2 0 0 1 22 16.9z"/></svg>
+              9555555
+            </a>
+          </div>
+          <div class="glass-chip rounded-xl p-4 text-center">
+            <div class="icon-badge green mx-auto mb-2"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg></div>
+            <div class="font-semibold text-sm mb-2" data-i18n="emgAmbulance"></div>
+            <a href="tel:999" class="flex items-center justify-center gap-1.5 text-white font-bold py-2 rounded-lg text-lg" style="background:linear-gradient(180deg,#a9d8b4,#4f9a63); box-shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 8px 18px -6px rgba(45,120,70,.55);">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7 12.8 12.8 0 0 0 .7 2.8 2 2 0 0 1-.4 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4 12.8 12.8 0 0 0 2.8.7A2 2 0 0 1 22 16.9z"/></svg>
+              999
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Govt shortcuts -->
+      <div class="card p-5 md:p-7">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge"><svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M4 21h16M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg></div>
+          <h2 class="text-xl font-bold" data-i18n="govSectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);" data-i18n="govSectionDesc"></p>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <a href="https://services.nidw.gov.bd/" target="_blank" rel="noopener" class="gov-link glass-chip rounded-xl p-4 flex items-center gap-3 transition-all hover:shadow-md">
+            <div class="icon-badge"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.2"/><circle cx="8" cy="12" r="2"/><path d="M13 10h6M13 14h4"/></svg></div>
+            <div class="flex-1">
+              <div class="font-semibold text-sm" data-i18n="govNid"></div>
+              <div class="text-xs flex items-center gap-1" style="color:var(--accent-2);">
+                <span data-i18n="govVisit"></span>
+                <svg class="icon icon-sm gov-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </div>
+            </div>
+          </a>
+          <a href="https://www.epassport.gov.bd/" target="_blank" rel="noopener" class="gov-link glass-chip rounded-xl p-4 flex items-center gap-3 transition-all hover:shadow-md">
+            <div class="icon-badge"><svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5V5.5"/></svg></div>
+            <div class="flex-1">
+              <div class="font-semibold text-sm" data-i18n="govPassport"></div>
+              <div class="text-xs flex items-center gap-1" style="color:var(--accent-2);">
+                <span data-i18n="govVisit"></span>
+                <svg class="icon icon-sm gov-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </div>
+            </div>
+          </a>
+          <a href="https://bsp.brta.gov.bd/" target="_blank" rel="noopener" class="gov-link glass-chip rounded-xl p-4 flex items-center gap-3 transition-all hover:shadow-md">
+            <div class="icon-badge"><svg class="icon" viewBox="0 0 24 24"><path d="M3 13l1.5-4.5A2 2 0 0 1 6.4 7h11.2a2 2 0 0 1 1.9 1.5L21 13"/><rect x="2" y="13" width="20" height="5" rx="1.5"/><circle cx="7" cy="18" r="1.5"/><circle cx="17" cy="18" r="1.5"/></svg></div>
+            <div class="flex-1">
+              <div class="font-semibold text-sm" data-i18n="govBrta"></div>
+              <div class="text-xs flex items-center gap-1" style="color:var(--accent-2);">
+                <span data-i18n="govVisit"></span>
+                <svg class="icon icon-sm gov-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </div>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <!-- Notes / To-do -->
+      <div class="card p-5 md:p-7">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="icon-badge purple"><svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M4 4h12l4 4v12H4z"/><path d="M8 4v5h8V4M8 13h8M8 17h5"/></svg></div>
+          <h2 class="text-xl font-bold" data-i18n="notesSectionTitle"></h2>
+        </div>
+        <p class="text-sm mb-5" style="color:var(--ink-soft);" data-i18n="notesSectionDesc"></p>
+
+        <div class="flex gap-2 mb-4">
+          <input type="text" id="noteInput" class="field flex-1 px-3 py-2 rounded-lg text-sm" data-i18n-placeholder="notesInputPlaceholder">
+          <button id="noteAddBtn" class="btn-primary px-4 rounded-lg font-semibold text-sm" data-i18n="notesAddBtn"></button>
+        </div>
+        <div id="notesList"></div>
+        <p id="notesEmpty" class="text-sm text-center py-4" style="color:var(--ink-soft);" data-i18n="notesEmptyMsg"></p>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<footer class="text-center text-xs" style="color:var(--ink-soft); padding-bottom:calc(5.5rem + env(safe-area-inset-bottom));" data-i18n="footerText"></footer>
+
+<!-- Toast -->
+<div id="toast" class="fixed left-1/2 -translate-x-1/2 px-4 py-2 rounded-full text-sm shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50"
+     style="bottom:calc(5.5rem + env(safe-area-inset-bottom)); background:linear-gradient(180deg, var(--accent-1), var(--accent-2)); color:var(--accent-ink);"></div>
+
+<script>
+/* ============================================================
+   TRANSLATIONS
+   ============================================================ */
+const translations = {
+  en: {
+    navHome: "Home", navMedia: "Media", navCalc: "Calculators", navIslamic: "Islamic", navMore: "More",
+
+    greetMorning: "Good morning", greetAfternoon: "Good afternoon", greetEvening: "Good evening", greetNight: "Good night",
+    recentTitle: "Recently visited",
+    nextPrayerLabel: "Next Prayer", nextPrayerCountdownPrefix: "in",
+
+    heroTitle: "Your Everyday Digital Toolkit",
+    heroSubtitle: "Images, calculators, Islamic tools, and emergency & government services — all in one place, instantly.",
+    allToolsTitle: "All Tools",
+
+    mediaPageDesc: "Resize images, make QR codes, and convert photos to PDF.",
+    calcPageDesc: "Age, units, BMI, EMI, VAT, and currency — all in one place.",
+    islamicPageDesc: "Prayer times, Hijri date converter, and Zakat calculator.",
+    morePageDesc: "Emergency hotlines, government services, and your notes.",
+
+    imgSectionTitle: "Image Resizer & Compressor",
+    imgSectionDesc: "Upload an image, choose a size, adjust quality, and download — all in your browser.",
+    imgUploadLabel: "Click or drop an image here",
+    imgQualityLabel: "Quality / Compression",
+    imgProcessBtn: "Process Image",
+    imgDownloadBtn: "Download",
+    imgPreviewPlaceholder: "Preview will appear here",
+    imgSizeLabel: "Output Size",
+    imgSizeOriginal: "100% (Original)",
+    imgSizeLarge: "Large — 1920px wide",
+    imgSizeHD: "HD — 1280px wide",
+    imgSizeMedium: "Medium — 800px wide",
+    imgSizeSmall: "Small — 480px wide",
+    imgSizeThumb: "Thumbnail — 150px wide",
+    imgSizePreviewPrefix: "New size: ",
+    imgSizeGroupPct: "Percentage",
+    imgSizeGroupPx: "Fixed Width",
+
+    qrSectionTitle: "QR Code Generator",
+    qrSectionDesc: "Turn any text, link, or phone number into a scannable QR code.",
+    qrInputLabel: "Text, URL, or phone number",
+    qrInputPlaceholder: "e.g. https://example.com",
+    qrGenerateBtn: "Generate QR",
+    qrDownloadBtn: "Download PNG",
+    qrPreviewPlaceholder: "QR code will appear here",
+
+    pdfSectionTitle: "Image to PDF",
+    pdfSectionDesc: "Combine one or more photos into a single downloadable PDF.",
+    pdfUploadLabel: "Click or drop image(s) here (multiple allowed)",
+    pdfConvertBtn: "Convert & Download PDF",
+
+    ageSectionTitle: "Age Calculator",
+    ageSectionDesc: "Enter your date of birth to find your exact age.",
+    ageDobLabel: "Date of Birth",
+    ageCalcBtn: "Calculate Age",
+    ageYearsLabel: "Years", ageMonthsLabel: "Months", ageDaysLabel: "Days",
+
+    unitSectionTitle: "Unit Converter",
+    unitSectionDesc: "Convert between length and Bangladeshi land units.",
+    unitTabLength: "Length", unitTabLand: "Land", unitFromLabel: "Value",
+
+    bmiSectionTitle: "BMI Calculator",
+    bmiSectionDesc: "Check your Body Mass Index from height and weight.",
+    bmiHeightLabel: "Height (cm)", bmiWeightLabel: "Weight (kg)", bmiCalcBtn: "Calculate BMI",
+    bmiUnderweight: "Underweight", bmiNormal: "Normal weight", bmiOverweight: "Overweight", bmiObese: "Obese",
+
+    emiSectionTitle: "Loan / EMI Calculator",
+    emiSectionDesc: "Estimate your monthly installment for any loan.",
+    emiPrincipalLabel: "Loan Amount (BDT)", emiRateLabel: "Interest Rate (% / year)", emiTenureLabel: "Tenure (months)",
+    emiCalcBtn: "Calculate EMI",
+    emiMonthlyLabel: "Monthly Installment", emiInterestLabel: "Total Interest", emiTotalLabel: "Total Payment",
+
+    vatSectionTitle: "VAT Calculator",
+    vatSectionDesc: "Add or remove VAT (default 15%, Bangladesh standard rate).",
+    vatModeExclusive: "Add VAT", vatModeInclusive: "Remove VAT",
+    vatAmountLabel: "Amount (BDT)", vatRateLabel: "VAT Rate (%)", vatCalcBtn: "Calculate",
+    vatNetLabel: "Net Amount", vatAmountVatLabel: "VAT Amount", vatTotalLabel: "Total Amount",
+
+    currencySectionTitle: "Currency Converter",
+    currencySectionDesc: "Convert between BDT and major world currencies using live rates.",
+    currencyAmountLabel: "Amount", currencyFromLabel: "From", currencyToLabel: "To",
+    currencyConvertBtn: "Convert", currencyLoading: "Fetching live rates…",
+    currencyFallbackNote: "(estimated rate — live rates unavailable)",
+    currencyErrorNote: "Couldn't fetch live rates, showing an estimate.",
+
+    prayerSectionTitle: "Prayer Times (Dhaka)",
+    prayerSectionDesc: "Approximate daily prayer schedule for Dhaka, Bangladesh.",
+    prayerApproxNote: "These are approximate monthly-average times. For exact timings, please check your local mosque or the Islamic Foundation Bangladesh calendar.",
+    prayerFajr: "Fajr", prayerSunrise: "Sunrise", prayerDhuhr: "Dhuhr", prayerAsr: "Asr", prayerMaghrib: "Maghrib", prayerIsha: "Isha",
+
+    hijriSectionTitle: "Hijri Date Converter",
+    hijriSectionDesc: "Convert any Gregorian date to the Islamic (Hijri) calendar.",
+    hijriDateLabel: "Gregorian Date", hijriConvertBtn: "Convert to Hijri",
+    hijriApproxNote: "Approximate — may differ by ±1 day from local moon-sighting announcements.",
+    hijriMonths: ["Muharram","Safar","Rabi' al-awwal","Rabi' al-thani","Jumada al-awwal","Jumada al-thani","Rajab","Sha'ban","Ramadan","Shawwal","Dhu al-Qi'dah","Dhu al-Hijjah"],
+
+    zakatSectionTitle: "Zakat Calculator",
+    zakatSectionDesc: "Check if Zakat is due on your wealth (based on 85g gold Nisab).",
+    zakatGoldPriceLabel: "Gold Price (BDT per gram)", zakatWealthLabel: "Your Total Zakat-able Wealth (BDT)",
+    zakatCalcBtn: "Calculate Zakat", zakatNisabPrefix: "Nisab threshold:",
+    zakatDueMsg: "Zakat is due. Pay:", zakatNotDueMsg: "Zakat is not due — your wealth is below the Nisab threshold.",
+
+    emgSectionTitle: "Emergency Hotlines",
+    emgSectionDesc: "Tap a card to call instantly in an emergency.",
+    emgNational: "National Emergency", emgPolice: "Police", emgFire: "Fire Service", emgAmbulance: "Ambulance",
+
+    govSectionTitle: "Essential Government Services",
+    govSectionDesc: "Quick links to primary official portals.",
+    govNid: "NID Application", govPassport: "e-Passport", govBrta: "BRTA BSP Services", govVisit: "Visit official site",
+
+    notesSectionTitle: "Quick Notes",
+    notesSectionDesc: "Jot down reminders — saved right in this browser.",
+    notesInputPlaceholder: "Write a note and press Add…",
+    notesAddBtn: "Add", notesEmptyMsg: "No notes yet. Add your first one above.",
+
+    footerText: "SmartHelper — Built for everyday convenience. All processing happens in your browser.",
+
+    toastNoImage: "Please upload an image first.",
+    toastProcessed: "Image processed! Click Download to save it.",
+    toastDownloaded: "Image downloaded.",
+    toastNoDob: "Please select your date of birth.",
+    toastFutureDob: "Date of birth cannot be in the future.",
+    toastQrEmpty: "Please type something first.",
+    toastQrGenerated: "QR code generated!",
+    toastPdfNoImages: "Please select at least one image.",
+    toastPdfGenerated: "PDF downloaded!",
+    toastCurrencySame: "Please pick two different currencies.",
+    toastNoteEmpty: "Please write a note first.",
+    toastBmiMissing: "Please enter both height and weight."
+  },
+  bn: {
+    navHome: "হোম", navMedia: "মিডিয়া", navCalc: "ক্যালকুলেটর", navIslamic: "ইসলামিক", navMore: "আরও",
+
+    greetMorning: "শুভ সকাল", greetAfternoon: "শুভ দুপুর", greetEvening: "শুভ সন্ধ্যা", greetNight: "শুভ রাত্রি",
+    recentTitle: "সম্প্রতি দেখেছেন",
+    nextPrayerLabel: "পরবর্তী নামাজ", nextPrayerCountdownPrefix: "বাকি",
+
+    heroTitle: "আপনার প্রতিদিনের ডিজিটাল টুলকিট",
+    heroSubtitle: "ছবি, ক্যালকুলেটর, ইসলামিক টুলস এবং জরুরি ও সরকারি সেবা — সব এক জায়গায়, তাৎক্ষণিকভাবে।",
+    allToolsTitle: "সব টুল",
+
+    mediaPageDesc: "ছবি রিসাইজ করুন, QR কোড বানান, এবং ছবি PDF-এ রূপান্তর করুন।",
+    calcPageDesc: "বয়স, ইউনিট, BMI, EMI, VAT এবং মুদ্রা — সব এক জায়গায়।",
+    islamicPageDesc: "নামাজের সময়, হিজরি তারিখ রূপান্তর এবং জাকাত ক্যালকুলেটর।",
+    morePageDesc: "জরুরি হটলাইন, সরকারি সেবা এবং আপনার নোট।",
+
+    imgSectionTitle: "ছবি রিসাইজার ও কম্প্রেসর",
+    imgSectionDesc: "একটি ছবি আপলোড করুন, সাইজ বেছে নিন, কোয়ালিটি সমন্বয় করুন এবং ডাউনলোড করুন — সবকিছু আপনার ব্রাউজারেই।",
+    imgUploadLabel: "ছবি আপলোড করতে ক্লিক করুন বা ড্র্যাগ করে ছাড়ুন",
+    imgQualityLabel: "কোয়ালিটি / কম্প্রেশন",
+    imgProcessBtn: "ছবি প্রসেস করুন",
+    imgDownloadBtn: "ডাউনলোড করুন",
+    imgPreviewPlaceholder: "প্রিভিউ এখানে দেখা যাবে",
+    imgSizeLabel: "আউটপুট সাইজ",
+    imgSizeOriginal: "১০০% (অরিজিনাল)",
+    imgSizeLarge: "বড় — ১৯২০px প্রস্থ",
+    imgSizeHD: "HD — ১২৮০px প্রস্থ",
+    imgSizeMedium: "মাঝারি — ৮০০px প্রস্থ",
+    imgSizeSmall: "ছোট — ৪৮০px প্রস্থ",
+    imgSizeThumb: "থাম্বনেইল — ১৫০px প্রস্থ",
+    imgSizePreviewPrefix: "নতুন সাইজ: ",
+    imgSizeGroupPct: "পার্সেন্টেজ",
+    imgSizeGroupPx: "নির্দিষ্ট প্রস্থ",
+
+    qrSectionTitle: "QR কোড জেনারেটর",
+    qrSectionDesc: "যেকোনো টেক্সট, লিংক বা ফোন নম্বরকে স্ক্যান করার মতো QR কোডে রূপান্তর করুন।",
+    qrInputLabel: "টেক্সট, URL বা ফোন নম্বর",
+    qrInputPlaceholder: "যেমন: https://example.com",
+    qrGenerateBtn: "QR তৈরি করুন",
+    qrDownloadBtn: "PNG ডাউনলোড করুন",
+    qrPreviewPlaceholder: "QR কোড এখানে দেখা যাবে",
+
+    pdfSectionTitle: "ছবি থেকে PDF",
+    pdfSectionDesc: "একাধিক ছবি একসাথে করে একটি PDF ফাইল বানান।",
+    pdfUploadLabel: "ছবি আপলোড করতে ক্লিক করুন বা ছাড়ুন (একাধিক নেওয়া যাবে)",
+    pdfConvertBtn: "PDF বানিয়ে ডাউনলোড করুন",
+
+    ageSectionTitle: "বয়স ক্যালকুলেটর",
+    ageSectionDesc: "আপনার জন্ম তারিখ দিন, সঠিক বয়স জানতে।",
+    ageDobLabel: "জন্ম তারিখ",
+    ageCalcBtn: "বয়স হিসাব করুন",
+    ageYearsLabel: "বছর", ageMonthsLabel: "মাস", ageDaysLabel: "দিন",
+
+    unitSectionTitle: "ইউনিট কনভার্টার",
+    unitSectionDesc: "দৈর্ঘ্য ও বাংলাদেশি জমির একক রূপান্তর করুন।",
+    unitTabLength: "দৈর্ঘ্য", unitTabLand: "জমি", unitFromLabel: "মান",
+
+    bmiSectionTitle: "BMI ক্যালকুলেটর",
+    bmiSectionDesc: "উচ্চতা ও ওজন দিয়ে আপনার বডি মাস ইনডেক্স জেনে নিন।",
+    bmiHeightLabel: "উচ্চতা (সেমি)", bmiWeightLabel: "ওজন (কেজি)", bmiCalcBtn: "BMI হিসাব করুন",
+    bmiUnderweight: "কম ওজন", bmiNormal: "স্বাভাবিক ওজন", bmiOverweight: "অতিরিক্ত ওজন", bmiObese: "স্থূলতা",
+
+    emiSectionTitle: "লোন / EMI ক্যালকুলেটর",
+    emiSectionDesc: "যেকোনো লোনের মাসিক কিস্তি হিসাব করুন।",
+    emiPrincipalLabel: "লোনের পরিমাণ (টাকা)", emiRateLabel: "সুদের হার (% / বছর)", emiTenureLabel: "মেয়াদ (মাস)",
+    emiCalcBtn: "EMI হিসাব করুন",
+    emiMonthlyLabel: "মাসিক কিস্তি", emiInterestLabel: "মোট সুদ", emiTotalLabel: "মোট পরিশোধ",
+
+    vatSectionTitle: "VAT ক্যালকুলেটর",
+    vatSectionDesc: "VAT যোগ বা বাদ দিন (ডিফল্ট ১৫%, বাংলাদেশের স্ট্যান্ডার্ড হার)।",
+    vatModeExclusive: "VAT যোগ করুন", vatModeInclusive: "VAT বাদ দিন",
+    vatAmountLabel: "পরিমাণ (টাকা)", vatRateLabel: "VAT হার (%)", vatCalcBtn: "হিসাব করুন",
+    vatNetLabel: "নিট পরিমাণ", vatAmountVatLabel: "VAT এর পরিমাণ", vatTotalLabel: "সর্বমোট",
+
+    currencySectionTitle: "মুদ্রা কনভার্টার",
+    currencySectionDesc: "লাইভ রেট ব্যবহার করে টাকা ও বিশ্বের প্রধান মুদ্রার মধ্যে রূপান্তর করুন।",
+    currencyAmountLabel: "পরিমাণ", currencyFromLabel: "থেকে", currencyToLabel: "তে",
+    currencyConvertBtn: "কনভার্ট করুন", currencyLoading: "লাইভ রেট আনা হচ্ছে…",
+    currencyFallbackNote: "(আনুমানিক রেট — লাইভ রেট পাওয়া যায়নি)",
+    currencyErrorNote: "লাইভ রেট আনা যায়নি, আনুমানিক রেট দেখানো হচ্ছে।",
+
+    prayerSectionTitle: "নামাজের সময় (ঢাকা)",
+    prayerSectionDesc: "ঢাকা, বাংলাদেশের আনুমানিক দৈনিক নামাজের সময়সূচি।",
+    prayerApproxNote: "এগুলো মাসিক গড় আনুমানিক সময়। সঠিক সময়ের জন্য স্থানীয় মসজিদ বা ইসলামিক ফাউন্ডেশন বাংলাদেশের ক্যালেন্ডার দেখুন।",
+    prayerFajr: "ফজর", prayerSunrise: "সূর্যোদয়", prayerDhuhr: "যোহর", prayerAsr: "আসর", prayerMaghrib: "মাগরিব", prayerIsha: "এশা",
+
+    hijriSectionTitle: "হিজরি তারিখ রূপান্তর",
+    hijriSectionDesc: "যেকোনো ইংরেজি তারিখকে ইসলামিক (হিজরি) ক্যালেন্ডারে রূপান্তর করুন।",
+    hijriDateLabel: "ইংরেজি তারিখ", hijriConvertBtn: "হিজরিতে রূপান্তর করুন",
+    hijriApproxNote: "আনুমানিক — স্থানীয় চাঁদ দেখা সাপেক্ষে ±১ দিন কমবেশি হতে পারে।",
+    hijriMonths: ["মুহররম","সফর","রবিউল আউয়াল","রবিউস সানি","জমাদিউল আউয়াল","জমাদিউস সানি","রজব","শাবান","রমজান","শাওয়াল","জিলকদ","জিলহজ"],
+
+    zakatSectionTitle: "জাকাত ক্যালকুলেটর",
+    zakatSectionDesc: "আপনার সম্পদের উপর জাকাত ফরজ কিনা দেখুন (৮৫ গ্রাম স্বর্ণের নিসাব ভিত্তিতে)।",
+    zakatGoldPriceLabel: "স্বর্ণের দাম (টাকা/গ্রাম)", zakatWealthLabel: "আপনার মোট জাকাতযোগ্য সম্পদ (টাকা)",
+    zakatCalcBtn: "জাকাত হিসাব করুন", zakatNisabPrefix: "নিসাব পরিমাণ:",
+    zakatDueMsg: "জাকাত ফরজ। পরিশোধ করুন:", zakatNotDueMsg: "জাকাত ফরজ নয় — আপনার সম্পদ নিসাবের চেয়ে কম।",
+
+    emgSectionTitle: "জরুরি হটলাইন",
+    emgSectionDesc: "জরুরি প্রয়োজনে কার্ডে ট্যাপ করে সরাসরি কল করুন।",
+    emgNational: "জাতীয় জরুরি সেবা", emgPolice: "পুলিশ", emgFire: "ফায়ার সার্ভিস", emgAmbulance: "অ্যাম্বুলেন্স",
+
+    govSectionTitle: "গুরুত্বপূর্ণ সরকারি সেবা",
+    govSectionDesc: "প্রধান সরকারি পোর্টালের দ্রুত লিংক।",
+    govNid: "এনআইডি আবেদন", govPassport: "ই-পাসপোর্ট", govBrta: "বিআরটিএ বিএসপি সার্ভিস", govVisit: "অফিসিয়াল সাইট দেখুন",
+
+    notesSectionTitle: "কুইক নোটস",
+    notesSectionDesc: "মনে রাখার মতো কিছু লিখে রাখুন — এই ব্রাউজারেই সেভ থাকবে।",
+    notesInputPlaceholder: "একটা নোট লিখে Add চাপুন…",
+    notesAddBtn: "যোগ করুন", notesEmptyMsg: "এখনো কোনো নোট নেই। উপরে প্রথমটা লিখুন।",
+
+    footerText: "স্মার্টহেল্পার — দৈনন্দিন সুবিধার জন্য তৈরি। সব প্রসেসিং আপনার ব্রাউজারেই হয়।",
+
+    toastNoImage: "অনুগ্রহ করে প্রথমে একটি ছবি আপলোড করুন।",
+    toastProcessed: "ছবি প্রসেস সম্পন্ন! সেভ করতে ডাউনলোড চাপুন।",
+    toastDownloaded: "ছবি ডাউনলোড হয়েছে।",
+    toastNoDob: "অনুগ্রহ করে আপনার জন্ম তারিখ নির্বাচন করুন।",
+    toastFutureDob: "জন্ম তারিখ ভবিষ্যতের হতে পারবে না।",
+    toastQrEmpty: "অনুগ্রহ করে আগে কিছু লিখুন।",
+    toastQrGenerated: "QR কোড তৈরি হয়েছে!",
+    toastPdfNoImages: "অনুগ্রহ করে অন্তত একটি ছবি নির্বাচন করুন।",
+    toastPdfGenerated: "PDF ডাউনলোড হয়েছে!",
+    toastCurrencySame: "অনুগ্রহ করে দুটি ভিন্ন মুদ্রা বেছে নিন।",
+    toastNoteEmpty: "অনুগ্রহ করে আগে একটা নোট লিখুন।",
+    toastBmiMissing: "অনুগ্রহ করে উচ্চতা ও ওজন দুটোই লিখুন।"
+  }
+};
+
+let currentLang = localStorage.getItem('sh_lang') || 'en';
+
+function applyLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('sh_lang', lang);
+  document.documentElement.setAttribute('data-lang', lang);
+  document.documentElement.lang = lang;
+  document.body.classList.toggle('font-bangla', lang === 'bn');
+
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (translations[lang][key] !== undefined) el.textContent = translations[lang][key];
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (translations[lang][key] !== undefined) el.placeholder = translations[lang][key];
+  });
+
+  const grpPct = document.getElementById('imgSizeGroupPct');
+  const grpPx = document.getElementById('imgSizeGroupPx');
+  if (grpPct) grpPct.label = translations[lang].imgSizeGroupPct;
+  if (grpPx) grpPx.label = translations[lang].imgSizeGroupPx;
+
+  const dot = document.getElementById('langDot');
+  dot.style.transform = lang === 'bn' ? 'translateX(100%)' : 'translateX(0)';
+
+  populateUnitSelects(currentUnitTab);
+  renderUnitConversion();
+  if (typeof updateSizePreview === 'function') updateSizePreview();
+  if (typeof renderPrayerList === 'function') renderPrayerList();
+  if (typeof updateGreeting === 'function') updateGreeting();
+  if (typeof renderRecent === 'function') renderRecent();
+  if (typeof renderNotes === 'function') renderNotes();
+  if (typeof populateCurrencySelects === 'function') populateCurrencySelects();
+}
+
+document.getElementById('langToggle').addEventListener('click', () => {
+  applyLang(currentLang === 'en' ? 'bn' : 'en');
+});
+
+/* ============================================================
+   THEME
+   ============================================================ */
+function applyTheme(theme) {
+  localStorage.setItem('sh_theme', theme);
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+  document.getElementById('iconSun').classList.toggle('hidden', theme !== 'dark');
+  document.getElementById('iconMoon').classList.toggle('hidden', theme === 'dark');
+}
+const savedTheme = localStorage.getItem('sh_theme') ||
+  (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+applyTheme(savedTheme);
+document.getElementById('themeToggle').addEventListener('click', () => {
+  const isDark = document.documentElement.classList.contains('dark');
+  applyTheme(isDark ? 'light' : 'dark');
+});
+
+/* ============================================================
+   MULTI-PAGE NAVIGATION + RECENTLY USED
+   ============================================================ */
+const pageNames = ['home', 'media', 'calc', 'islamic', 'more'];
+const pageEls = document.querySelectorAll('.page');
+const navBtns = document.querySelectorAll('.nav-btn');
+
+function getRecent() {
+  try { return JSON.parse(localStorage.getItem('sh_recent') || '[]'); } catch(e) { return []; }
+}
+function addRecent(name) {
+  if (name === 'home') return;
+  let list = getRecent().filter(n => n !== name);
+  list.unshift(name);
+  list = list.slice(0, 4);
+  try { localStorage.setItem('sh_recent', JSON.stringify(list)); } catch(e) {}
+}
+const navIconMap = {
+  media: '<svg class="icon icon-xs" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>',
+  calc: '<svg class="icon icon-xs" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M7.5 11h9M7.5 14.5h9M7.5 18h9"/></svg>',
+  islamic: '<svg class="icon icon-xs" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 1 3 3c0 1.1-.6 2-1.5 2.5V9h-3V7.5C9.6 7 9 6.1 9 5a3 3 0 0 1 3-3z"/></svg>',
+  more: '<svg class="icon icon-xs" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>'
+};
+function renderRecent() {
+  const wrap = document.getElementById('recentWrap');
+  const box = document.getElementById('recentChips');
+  const list = getRecent();
+  if (!list.length) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  box.innerHTML = '';
+  list.forEach(name => {
+    if (!pageNames.includes(name)) return;
+    const chip = document.createElement('button');
+    chip.className = 'recent-chip glass-chip';
+    chip.innerHTML = (navIconMap[name] || '') + '<span>' + (translations[currentLang]['nav' + name.charAt(0).toUpperCase() + name.slice(1)] || name) + '</span>';
+    chip.addEventListener('click', () => showPage(name));
+    box.appendChild(chip);
+  });
+}
+
+function showPage(name) {
+  if (!pageNames.includes(name)) name = 'home';
+  pageEls.forEach(p => p.classList.toggle('active', p.getAttribute('data-page') === name));
+  navBtns.forEach(b => b.classList.toggle('nav-active', b.getAttribute('data-nav') === name));
+  if (location.hash.replace('#', '') !== name) history.replaceState(null, '', '#' + name);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  addRecent(name);
+  renderRecent();
+}
+
+navBtns.forEach(btn => btn.addEventListener('click', () => showPage(btn.getAttribute('data-nav'))));
+document.querySelectorAll('[data-goto]').forEach(el => el.addEventListener('click', () => showPage(el.getAttribute('data-goto'))));
+document.getElementById('logoHomeBtn').addEventListener('click', () => showPage('home'));
+window.addEventListener('hashchange', () => showPage(location.hash.replace('#', '')));
+
+/* ============================================================
+   GREETING + LIVE CLOCK
+   ============================================================ */
+function updateGreeting() {
+  const now = new Date();
+  const h = now.getHours();
+  let key = 'greetMorning';
+  if (h >= 12 && h < 16) key = 'greetAfternoon';
+  else if (h >= 16 && h < 19) key = 'greetEvening';
+  else if (h >= 19 || h < 5) key = 'greetNight';
+  document.getElementById('greetingText').textContent = translations[currentLang][key] + ' •';
+  const hh = String(h % 12 === 0 ? 12 : h % 12).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  document.getElementById('liveClock').textContent = `${hh}:${mm} ${ampm}`;
+}
+updateGreeting();
+setInterval(updateGreeting, 30000);
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+let toastTimer;
+function showToast(key) {
+  const el = document.getElementById('toast');
+  el.textContent = translations[currentLang][key] || key;
+  el.classList.remove('opacity-0');
+  el.classList.add('opacity-100');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.classList.remove('opacity-100'); el.classList.add('opacity-0'); }, 2500);
+}
+
+/* ============================================================
+   IMAGE RESIZER / COMPRESSOR
+   ============================================================ */
+const imgInput = document.getElementById('imgInput');
+const dropZone = document.getElementById('dropZone');
+const imgSizeSelect = document.getElementById('imgSizeSelect');
+const imgSizePreviewDims = document.getElementById('imgSizePreviewDims');
+const qualitySlider = document.getElementById('imgQuality');
+const qualityVal = document.getElementById('imgQualityVal');
+const imgPreview = document.getElementById('imgPreview');
+const imgPreviewPlaceholder = document.getElementById('imgPreviewPlaceholder');
+const imgProcessBtn = document.getElementById('imgProcessBtn');
+const imgDownloadBtn = document.getElementById('imgDownloadBtn');
+const imgSizeInfo = document.getElementById('imgSizeInfo');
+
+let originalImage = null, originalRatio = 1, originalFileSize = 0, processedDataUrl = null;
+
+dropZone.addEventListener('click', () => imgInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--accent-2)'; });
+dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = 'var(--input-border)'; });
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.style.borderColor = 'var(--input-border)';
+  if (e.dataTransfer.files && e.dataTransfer.files[0]) { imgInput.files = e.dataTransfer.files; handleImageFile(e.dataTransfer.files[0]); }
+});
+imgInput.addEventListener('change', () => { if (imgInput.files[0]) handleImageFile(imgInput.files[0]); });
+
+function handleImageFile(file) {
+  originalFileSize = file.size;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      originalImage = img;
+      originalRatio = img.width / img.height;
+      imgPreview.src = e.target.result;
+      imgPreview.classList.remove('hidden');
+      imgPreviewPlaceholder.classList.add('hidden');
+      imgDownloadBtn.disabled = true;
+      imgSizeInfo.textContent = '';
+      updateSizePreview();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function getTargetDims() {
+  if (!originalImage) return { w: 0, h: 0 };
+  const val = imgSizeSelect.value;
+  if (val.startsWith('pct-')) {
+    const pct = parseInt(val.split('-')[1]) / 100;
+    return { w: Math.max(1, Math.round(originalImage.width * pct)), h: Math.max(1, Math.round(originalImage.height * pct)) };
+  }
+  if (val.startsWith('w-')) {
+    const w = parseInt(val.split('-')[1]);
+    return { w, h: Math.max(1, Math.round(w / originalRatio)) };
+  }
+  return { w: originalImage.width, h: originalImage.height };
+}
+function updateSizePreview() {
+  if (!originalImage) { imgSizePreviewDims.textContent = ''; return; }
+  const { w, h } = getTargetDims();
+  const prefix = translations[currentLang].imgSizePreviewPrefix || '';
+  imgSizePreviewDims.textContent = `${prefix}${w} × ${h} px`;
+}
+imgSizeSelect.addEventListener('change', updateSizePreview);
+qualitySlider.addEventListener('input', () => { qualityVal.textContent = qualitySlider.value + '%'; });
+
+imgProcessBtn.addEventListener('click', () => {
+  if (!originalImage) { showToast('toastNoImage'); return; }
+  const { w, h } = getTargetDims();
+  const quality = parseInt(qualitySlider.value) / 100;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(originalImage, 0, 0, w, h);
+  canvas.toBlob((blob) => {
+    processedDataUrl = canvas.toDataURL('image/jpeg', quality);
+    imgPreview.src = processedDataUrl;
+    imgDownloadBtn.disabled = false;
+    const kb = (blob.size / 1024).toFixed(1);
+    const origKb = (originalFileSize / 1024).toFixed(1);
+    imgSizeInfo.textContent = `${origKb} KB → ${kb} KB (${w}×${h})`;
+    showToast('toastProcessed');
+  }, 'image/jpeg', quality);
+});
+imgDownloadBtn.addEventListener('click', () => {
+  if (!processedDataUrl) return;
+  const a = document.createElement('a'); a.href = processedDataUrl; a.download = 'smarthelper-image.jpg';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  showToast('toastDownloaded');
+});
+
+/* ============================================================
+   QR CODE GENERATOR
+   ============================================================ */
+const qrInput = document.getElementById('qrInput');
+const qrGenerateBtn = document.getElementById('qrGenerateBtn');
+const qrDownloadBtn = document.getElementById('qrDownloadBtn');
+const qrCanvasBox = document.getElementById('qrCanvasBox');
+const qrPlaceholder = document.getElementById('qrPlaceholder');
+let qrInstance = null;
+
+qrGenerateBtn.addEventListener('click', () => {
+  const text = qrInput.value.trim();
+  if (!text) { showToast('toastQrEmpty'); return; }
+  qrCanvasBox.innerHTML = '';
+  qrPlaceholder.classList.add('hidden');
+  try {
+    qrInstance = new QRCode(qrCanvasBox, {
+      text, width: 220, height: 220,
+      colorDark: '#4a3410', colorLight: '#fffdf9',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+    qrDownloadBtn.disabled = false;
+    showToast('toastQrGenerated');
+  } catch (e) {
+    qrPlaceholder.classList.remove('hidden');
+  }
+});
+qrDownloadBtn.addEventListener('click', () => {
+  const canvas = qrCanvasBox.querySelector('canvas');
+  const img = qrCanvasBox.querySelector('img');
+  let url = null;
+  if (canvas) url = canvas.toDataURL('image/png');
+  else if (img) url = img.src;
+  if (!url) return;
+  const a = document.createElement('a'); a.href = url; a.download = 'smarthelper-qr.png';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+});
+
+/* ============================================================
+   IMAGE TO PDF
+   ============================================================ */
+const pdfInput = document.getElementById('pdfInput');
+const pdfDropZone = document.getElementById('pdfDropZone');
+const pdfFileCount = document.getElementById('pdfFileCount');
+const pdfConvertBtn = document.getElementById('pdfConvertBtn');
+let pdfFiles = [];
+
+pdfDropZone.addEventListener('click', () => pdfInput.click());
+pdfDropZone.addEventListener('dragover', e => { e.preventDefault(); pdfDropZone.style.borderColor = 'var(--accent-2)'; });
+pdfDropZone.addEventListener('dragleave', () => { pdfDropZone.style.borderColor = 'var(--input-border)'; });
+pdfDropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  pdfDropZone.style.borderColor = 'var(--input-border)';
+  if (e.dataTransfer.files && e.dataTransfer.files.length) { pdfFiles = Array.from(e.dataTransfer.files); updatePdfCount(); }
+});
+pdfInput.addEventListener('change', () => { pdfFiles = Array.from(pdfInput.files || []); updatePdfCount(); });
+function updatePdfCount() {
+  pdfFileCount.textContent = pdfFiles.length ? `${pdfFiles.length} ${currentLang === 'bn' ? 'টি ছবি নির্বাচিত' : 'image(s) selected'}` : '';
+}
+function fileToImageEl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => resolve({ img, dataUrl: e.target.result });
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+pdfConvertBtn.addEventListener('click', async () => {
+  if (!pdfFiles.length) { showToast('toastPdfNoImages'); return; }
+  try {
+    const { jsPDF } = window.jspdf;
+    let doc = null;
+    for (let i = 0; i < pdfFiles.length; i++) {
+      const { img, dataUrl } = await fileToImageEl(pdfFiles[i]);
+      const orientation = img.width > img.height ? 'l' : 'p';
+      if (!doc) doc = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
+      else doc.addPage('a4', orientation);
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 8;
+      const maxW = pageWidth - margin * 2, maxH = pageHeight - margin * 2;
+      let w = img.width, h = img.height;
+      const scale = Math.min(maxW / w, maxH / h);
+      w *= scale; h *= scale;
+      const x = (pageWidth - w) / 2, y = (pageHeight - h) / 2;
+      const fmt = dataUrl.indexOf('image/png') !== -1 ? 'PNG' : 'JPEG';
+      doc.addImage(dataUrl, fmt, x, y, w, h);
+    }
+    doc.save('smarthelper-images.pdf');
+    showToast('toastPdfGenerated');
+  } catch (e) {
+    showToast('toastPdfNoImages');
+  }
+});
+
+/* ============================================================
+   AGE CALCULATOR
+   ============================================================ */
+document.getElementById('ageCalcBtn').addEventListener('click', () => {
+  const dobVal = document.getElementById('dobInput').value;
+  if (!dobVal) { showToast('toastNoDob'); return; }
+  const dob = new Date(dobVal);
+  const today = new Date();
+  if (dob > today) { showToast('toastFutureDob'); return; }
+  let years = today.getFullYear() - dob.getFullYear();
+  let months = today.getMonth() - dob.getMonth();
+  let days = today.getDate() - dob.getDate();
+  if (days < 0) { months -= 1; days += new Date(today.getFullYear(), today.getMonth(), 0).getDate(); }
+  if (months < 0) { years -= 1; months += 12; }
+  document.getElementById('ageYears').textContent = years;
+  document.getElementById('ageMonths').textContent = months;
+  document.getElementById('ageDays').textContent = days;
+  document.getElementById('ageResult').classList.remove('hidden');
+});
+
+/* ============================================================
+   UNIT CONVERTER
+   ============================================================ */
+const unitData = {
+  length: {
+    labels: { en: { m:'Meter', km:'Kilometer', cm:'Centimeter', mi:'Mile', ft:'Foot', in:'Inch', yd:'Yard' },
+              bn: { m:'মিটার', km:'কিলোমিটার', cm:'সেন্টিমিটার', mi:'মাইল', ft:'ফুট', in:'ইঞ্চি', yd:'গজ' } },
+    toBase: { m:1, km:1000, cm:0.01, mi:1609.344, ft:0.3048, in:0.0254, yd:0.9144 },
+    default: ['m','ft']
+  },
+  land: {
+    labels: { en: { katha:'Katha', bigha:'Bigha', shotangsho:'Shotangsho (Decimal)', acre:'Acre', sqft:'Square Feet', sqm:'Square Meter' },
+              bn: { katha:'কাঠা', bigha:'বিঘা', shotangsho:'শতাংশ', acre:'একর', sqft:'বর্গফুট', sqm:'বর্গমিটার' } },
+    toBase: { katha:720, bigha:14400, shotangsho:435.6, acre:43560, sqft:1, sqm:10.7639 },
+    default: ['katha','shotangsho']
+  }
+};
+let currentUnitTab = 'length';
+document.querySelectorAll('.unitTab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentUnitTab = btn.getAttribute('data-tab');
+    document.querySelectorAll('.unitTab').forEach(b => { b.classList.remove('btn-primary'); b.classList.add('btn-secondary'); });
+    btn.classList.add('btn-primary'); btn.classList.remove('btn-secondary');
+    populateUnitSelects(currentUnitTab); renderUnitConversion();
+  });
+});
+function populateUnitSelects(tabKey) {
+  const data = unitData[tabKey];
+  const labels = data.labels[currentLang];
+  const fromSel = document.getElementById('unitFrom');
+  const toSel = document.getElementById('unitTo');
+  fromSel.innerHTML = ''; toSel.innerHTML = '';
+  Object.keys(data.toBase).forEach(key => {
+    const o1 = document.createElement('option'); o1.value = key; o1.textContent = labels[key];
+    const o2 = o1.cloneNode(true);
+    fromSel.appendChild(o1); toSel.appendChild(o2);
+  });
+  fromSel.value = data.default[0]; toSel.value = data.default[1];
+}
+function renderUnitConversion() {
+  const data = unitData[currentUnitTab];
+  const fromUnit = document.getElementById('unitFrom').value;
+  const toUnit = document.getElementById('unitTo').value;
+  const value = parseFloat(document.getElementById('unitValue').value) || 0;
+  const baseValue = value * data.toBase[fromUnit];
+  const result = baseValue / data.toBase[toUnit];
+  document.getElementById('unitResult').value = (Math.round(result * 10000) / 10000).toString();
+}
+document.getElementById('unitValue').addEventListener('input', renderUnitConversion);
+document.getElementById('unitFrom').addEventListener('change', renderUnitConversion);
+document.getElementById('unitTo').addEventListener('change', renderUnitConversion);
+
+/* ============================================================
+   BMI CALCULATOR
+   ============================================================ */
+document.getElementById('bmiCalcBtn').addEventListener('click', () => {
+  const h = parseFloat(document.getElementById('bmiHeight').value);
+  const w = parseFloat(document.getElementById('bmiWeight').value);
+  if (!h || !w) { showToast('toastBmiMissing'); return; }
+  const bmi = w / Math.pow(h / 100, 2);
+  let catKey = 'bmiNormal';
+  if (bmi < 18.5) catKey = 'bmiUnderweight';
+  else if (bmi < 25) catKey = 'bmiNormal';
+  else if (bmi < 30) catKey = 'bmiOverweight';
+  else catKey = 'bmiObese';
+  document.getElementById('bmiValue').textContent = bmi.toFixed(1);
+  document.getElementById('bmiCategory').textContent = translations[currentLang][catKey];
+  document.getElementById('bmiResult').classList.remove('hidden');
+});
+
+/* ============================================================
+   EMI / LOAN CALCULATOR
+   ============================================================ */
+document.getElementById('emiCalcBtn').addEventListener('click', () => {
+  const P = parseFloat(document.getElementById('emiPrincipal').value) || 0;
+  const annualRate = parseFloat(document.getElementById('emiRate').value) || 0;
+  const n = parseInt(document.getElementById('emiTenure').value) || 0;
+  if (P <= 0 || n <= 0) return;
+  const r = annualRate / 12 / 100;
+  const emi = r === 0 ? P / n : (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+  const total = emi * n;
+  const interest = total - P;
+  const fmt = (v) => Math.round(v).toLocaleString('en-US');
+  document.getElementById('emiMonthlyVal').textContent = '৳' + fmt(emi);
+  document.getElementById('emiInterestVal').textContent = '৳' + fmt(interest);
+  document.getElementById('emiTotalVal').textContent = '৳' + fmt(total);
+  document.getElementById('emiResult').classList.remove('hidden');
+});
+
+/* ============================================================
+   VAT CALCULATOR
+   ============================================================ */
+let vatMode = 'exclusive';
+document.querySelectorAll('.vatModeTab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    vatMode = btn.getAttribute('data-mode');
+    document.querySelectorAll('.vatModeTab').forEach(b => { b.classList.remove('btn-primary'); b.classList.add('btn-secondary'); });
+    btn.classList.add('btn-primary'); btn.classList.remove('btn-secondary');
+  });
+});
+document.getElementById('vatCalcBtn').addEventListener('click', () => {
+  const amount = parseFloat(document.getElementById('vatAmount').value) || 0;
+  const rate = parseFloat(document.getElementById('vatRate').value) || 0;
+  let net, vat, total;
+  if (vatMode === 'exclusive') { net = amount; vat = net * rate / 100; total = net + vat; }
+  else { total = amount; net = total / (1 + rate / 100); vat = total - net; }
+  const fmt = (v) => Math.round(v * 100) / 100;
+  document.getElementById('vatNetVal').textContent = '৳' + fmt(net).toLocaleString('en-US');
+  document.getElementById('vatVatVal').textContent = '৳' + fmt(vat).toLocaleString('en-US');
+  document.getElementById('vatTotalVal').textContent = '৳' + fmt(total).toLocaleString('en-US');
+  document.getElementById('vatResult').classList.remove('hidden');
+});
+
+/* ============================================================
+   CURRENCY CONVERTER
+   ============================================================ */
+const currencyList = ['BDT','USD','EUR','GBP','INR','SAR','AED','MYR'];
+const FALLBACK_USD_RATES = { USD:1, BDT:119.5, EUR:0.92, GBP:0.79, INR:84.3, SAR:3.75, AED:3.67, MYR:4.47 };
+function populateCurrencySelects() {
+  const fromSel = document.getElementById('currencyFrom');
+  const toSel = document.getElementById('currencyTo');
+  if (!fromSel || fromSel.options.length) return;
+  currencyList.forEach(c => {
+    fromSel.appendChild(new Option(c, c));
+    toSel.appendChild(new Option(c, c));
+  });
+  fromSel.value = 'USD'; toSel.value = 'BDT';
+}
+populateCurrencySelects();
+async function getRates() {
+  try {
+    const res = await fetch('https://open.er-api.com/v6/latest/USD');
+    const data = await res.json();
+    if (data && data.rates) return { rates: data.rates, live: true };
+  } catch (e) {}
+  return { rates: FALLBACK_USD_RATES, live: false };
+}
+document.getElementById('currencyConvertBtn').addEventListener('click', async () => {
+  const amount = parseFloat(document.getElementById('currencyAmount').value) || 0;
+  const from = document.getElementById('currencyFrom').value;
+  const to = document.getElementById('currencyTo').value;
+  const resBox = document.getElementById('currencyResult');
+  const resVal = document.getElementById('currencyResultVal');
+  const resNote = document.getElementById('currencyResultNote');
+  resBox.classList.remove('hidden');
+  resVal.textContent = '…';
+  resNote.textContent = translations[currentLang].currencyLoading;
+  const { rates, live } = await getRates();
+  if (!rates[from] || !rates[to]) { resNote.textContent = translations[currentLang].currencyErrorNote; return; }
+  const amountUSD = amount / rates[from];
+  const result = amountUSD * rates[to];
+  resVal.textContent = `${amount.toLocaleString('en-US')} ${from} = ${result.toLocaleString('en-US', {maximumFractionDigits:2})} ${to}`;
+  resNote.textContent = live ? '' : translations[currentLang].currencyFallbackNote;
+});
+
+/* ============================================================
+   PRAYER TIMES (Dhaka — approximate monthly averages)
+   ============================================================ */
+const prayerTable = {
+  1:{fajr:'05:20',sunrise:'06:40',dhuhr:'12:05',asr:'15:30',maghrib:'17:25',isha:'18:45'},
+  2:{fajr:'05:05',sunrise:'06:20',dhuhr:'12:10',asr:'15:45',maghrib:'17:45',isha:'19:00'},
+  3:{fajr:'04:45',sunrise:'06:00',dhuhr:'12:10',asr:'16:00',maghrib:'18:05',isha:'19:15'},
+  4:{fajr:'04:15',sunrise:'05:35',dhuhr:'12:05',asr:'16:15',maghrib:'18:20',isha:'19:35'},
+  5:{fajr:'04:00',sunrise:'05:20',dhuhr:'12:05',asr:'16:25',maghrib:'18:35',isha:'19:55'},
+  6:{fajr:'03:55',sunrise:'05:15',dhuhr:'12:10',asr:'16:30',maghrib:'18:45',isha:'20:05'},
+  7:{fajr:'04:00',sunrise:'05:20',dhuhr:'12:15',asr:'16:35',maghrib:'18:45',isha:'20:05'},
+  8:{fajr:'04:15',sunrise:'05:30',dhuhr:'12:15',asr:'16:30',maghrib:'18:35',isha:'19:55'},
+  9:{fajr:'04:30',sunrise:'05:40',dhuhr:'12:05',asr:'16:15',maghrib:'18:15',isha:'19:30'},
+  10:{fajr:'04:45',sunrise:'05:55',dhuhr:'11:55',asr:'15:55',maghrib:'17:50',isha:'19:05'},
+  11:{fajr:'04:55',sunrise:'06:10',dhuhr:'11:55',asr:'15:40',maghrib:'17:30',isha:'18:50'},
+  12:{fajr:'05:10',sunrise:'06:25',dhuhr:'12:00',asr:'15:30',maghrib:'17:20',isha:'18:40'}
+};
+const prayerOrder = ['fajr','sunrise','dhuhr','asr','maghrib','isha'];
+const prayerIcons = {
+  fajr: '<path d="M12 2v3M4.2 4.2l2 2M19.8 4.2l-2 2M2 12h3M19 12h3"/><path d="M5 19h14M7 19a5 5 0 0 1 10 0"/>',
+  sunrise: '<path d="M12 4v3M5.6 6.6l1.8 1.8M18.4 6.6l-1.8 1.8M2 15h20M4 19h16"/><path d="M8 15a4 4 0 0 1 8 0"/>',
+  dhuhr: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
+  asr: '<circle cx="12" cy="14" r="4"/><path d="M12 7v2M5.6 10.6l1.4 1.4M18.4 10.6l-1.4 1.4M2 18h20"/>',
+  maghrib: '<path d="M2 18h20"/><path d="M5 18a7 7 0 0 1 14 0"/><path d="M4.2 7.2l1.4 1.4M19.8 7.2l-1.4 1.4M12 2v4"/>',
+  isha: '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>'
+};
+function getNowPrayerTimes() { return prayerTable[new Date().getMonth() + 1]; }
+function computeNextPrayer() {
+  const times = getNowPrayerTimes();
+  const prayList = ['fajr','dhuhr','asr','maghrib','isha'];
+  const now = new Date();
+  for (const key of prayList) {
+    const [hh, mm] = times[key].split(':').map(Number);
+    const t = new Date(now); t.setHours(hh, mm, 0, 0);
+    if (t > now) return { key, time: t };
+  }
+  const [hh, mm] = times['fajr'].split(':').map(Number);
+  const t = new Date(now); t.setDate(t.getDate() + 1); t.setHours(hh, mm, 0, 0);
+  return { key: 'fajr', time: t };
+}
+function renderPrayerList() {
+  const box = document.getElementById('prayerList');
+  if (!box) return;
+  const times = getNowPrayerTimes();
+  const next = computeNextPrayer();
+  box.innerHTML = '';
+  prayerOrder.forEach(key => {
+    const row = document.createElement('div');
+    const isNext = key === next.key;
+    row.className = 'list-row glass-chip' + (isNext ? ' row-active' : '');
+    row.innerHTML = `
+      <div class="flex items-center gap-2.5">
+        <svg class="icon icon-sm" viewBox="0 0 24 24">${prayerIcons[key]}</svg>
+        <span class="font-semibold text-sm">${translations[currentLang]['prayer' + key.charAt(0).toUpperCase() + key.slice(1)]}</span>
+      </div>
+      <span class="font-bold text-sm">${formatTime12(times[key])}</span>`;
+    box.appendChild(row);
+  });
+}
+function formatTime12(hhmm) {
+  let [h, m] = hhmm.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if (h === 0) h = 12;
+  return `${h}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+function updateNextPrayerWidget() {
+  const next = computeNextPrayer();
+  document.getElementById('nextPrayerName').textContent = translations[currentLang]['prayer' + next.key.charAt(0).toUpperCase() + next.key.slice(1)];
+  document.getElementById('nextPrayerTime').textContent = next.time.toLocaleTimeString(currentLang === 'bn' ? 'bn-BD' : 'en-US', { hour:'numeric', minute:'2-digit' });
+  const diffMs = next.time - new Date();
+  const totalMin = Math.max(0, Math.floor(diffMs / 60000));
+  const hrs = Math.floor(totalMin / 60), mins = totalMin % 60;
+  document.getElementById('nextPrayerCountdown').textContent = `${hrs}h ${mins}m`;
+}
+updateNextPrayerWidget();
+renderPrayerList();
+setInterval(() => { updateNextPrayerWidget(); renderPrayerList(); }, 60000);
+
+/* ============================================================
+   HIJRI DATE CONVERTER
+   ============================================================ */
+function gregorianToJD(y, m, d) {
+  return Math.floor((1461 * (y + 4800 + Math.floor((m - 14) / 12))) / 4) +
+    Math.floor((367 * (m - 2 - 12 * Math.floor((m - 14) / 12))) / 12) -
+    Math.floor((3 * Math.floor((y + 4900 + Math.floor((m - 14) / 12)) / 100)) / 4) +
+    d - 32075;
+}
+function jdToHijri(jdIn) {
+  let jd = jdIn - 1948440 + 10632;
+  const n = Math.floor((jd - 1) / 10631);
+  jd = jd - 10631 * n + 354;
+  const j = Math.floor((10985 - jd) / 5316) * Math.floor((50 * jd) / 17719) + Math.floor(jd / 5670) * Math.floor((43 * jd) / 15238);
+  jd = jd - Math.floor((30 - j) / 15) * Math.floor((17719 * j) / 50) - Math.floor(j / 16) * Math.floor((15238 * j) / 43) + 29;
+  const month = Math.floor((24 * jd) / 709);
+  const day = jd - Math.floor((709 * month) / 24);
+  const year = 30 * n + j - 30;
+  return { year, month, day };
+}
+document.getElementById('hijriConvertBtn').addEventListener('click', () => {
+  const val = document.getElementById('hijriInput').value;
+  if (!val) return;
+  const [y, m, d] = val.split('-').map(Number);
+  const jd = gregorianToJD(y, m, d);
+  const h = jdToHijri(jd);
+  const monthName = translations[currentLang].hijriMonths[h.month - 1] || h.month;
+  document.getElementById('hijriResultVal').textContent = `${h.day} ${monthName} ${h.year} AH`;
+  document.getElementById('hijriResult').classList.remove('hidden');
+});
+
+/* ============================================================
+   ZAKAT CALCULATOR
+   ============================================================ */
+document.getElementById('zakatCalcBtn').addEventListener('click', () => {
+  const goldPrice = parseFloat(document.getElementById('zakatGoldPrice').value) || 0;
+  const wealth = parseFloat(document.getElementById('zakatWealth').value) || 0;
+  if (goldPrice <= 0) return;
+  const nisab = goldPrice * 85;
+  const resBox = document.getElementById('zakatResult');
+  document.getElementById('zakatNisabVal').textContent = '৳' + Math.round(nisab).toLocaleString('en-US');
+  const msgEl = document.getElementById('zakatResultMsg');
+  if (wealth >= nisab) {
+    const due = wealth * 0.025;
+    msgEl.textContent = translations[currentLang].zakatDueMsg + ' ৳' + Math.round(due).toLocaleString('en-US');
+    msgEl.style.color = 'var(--accent-2)';
+  } else {
+    msgEl.textContent = translations[currentLang].zakatNotDueMsg;
+    msgEl.style.color = 'var(--ink)';
+  }
+  resBox.classList.remove('hidden');
+});
+
+/* ============================================================
+   NOTES / TO-DO (localStorage)
+   ============================================================ */
+function getNotes() { try { return JSON.parse(localStorage.getItem('sh_notes') || '[]'); } catch(e) { return []; } }
+function saveNotes(list) { try { localStorage.setItem('sh_notes', JSON.stringify(list)); } catch(e) {} }
+function renderNotes() {
+  const list = getNotes();
+  const box = document.getElementById('notesList');
+  const empty = document.getElementById('notesEmpty');
+  if (!box) return;
+  box.innerHTML = '';
+  empty.classList.toggle('hidden', list.length > 0);
+  list.forEach(note => {
+    const row = document.createElement('div');
+    row.className = 'note-item glass-chip';
+    row.innerHTML = `<span class="text-sm flex-1">${escapeHtml(note.text)}</span>
+      <svg class="icon icon-sm note-del" data-id="${note.id}" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>`;
+    box.appendChild(row);
+  });
+  box.querySelectorAll('.note-del').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.getAttribute('data-id');
+      saveNotes(getNotes().filter(n => String(n.id) !== id));
+      renderNotes();
+    });
+  });
+}
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+document.getElementById('noteAddBtn').addEventListener('click', addNote);
+document.getElementById('noteInput').addEventListener('keydown', e => { if (e.key === 'Enter') addNote(); });
+function addNote() {
+  const input = document.getElementById('noteInput');
+  const text = input.value.trim();
+  if (!text) { showToast('toastNoteEmpty'); return; }
+  const list = getNotes();
+  list.unshift({ id: Date.now(), text });
+  saveNotes(list);
+  input.value = '';
+  renderNotes();
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+populateUnitSelects(currentUnitTab);
+applyLang(currentLang);
+renderRecent();
+renderNotes();
+showPage(location.hash.replace('#', '') || 'home');
+</script>
+
+</body>
+</html>
